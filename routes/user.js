@@ -16,7 +16,7 @@ router.post('/signup', (req, res) => { // création d'un nouveau compte user
     return;
   }
 
-  // On vérifie que le user n'est pas déjà enregistré. Si non, on en créé un nouveau
+  // On vérifie que le user n'est pas déjà enregistré. Si non, on en crée un nouveau
   User.findOne({ $or: [{ email }, { username }] })
     
     .then(existingUser  => {
