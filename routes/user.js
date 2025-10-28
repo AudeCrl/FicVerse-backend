@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 
-const User = require('../models/users');
+const { User } = require('../models/users');
 const { checkBody } = require('../modules/checkBody');
 const uid2 = require('uid2');
 const bcrypt = require('bcrypt');
@@ -17,26 +17,30 @@ router.post('/signup', (req, res) => { // création d'un nouveau compte user
   }
 
   // On vérifie que le user n'est pas déjà enregistré. Si non, on en créé un nouveau
-  User.findOne({ $or: [{ email: req.body.email }, { username: req.body.username }] })
+  User.findOne({ $or: [{ email }, { username }] })
     
-    .then(data => {
-      if (data === null) {
+    .then(existingUser  => {
+      if (existingUser  === null) {
         const hash = bcrypt.hashSync(password, 10);
         const newUser = new User({
           email,      // suite à la destructuration au début de la route avec const { email, username, password } = req.body;
           username,
-          password: hash,
+          passwordHash: hash,
           token: uid2(32),
-      });
+        });
 
-      newUser.save().then(data => {
-        res.json({ result: true, user: data });
-      });
-    } else {
-      // Si le user existe déjà dans la BDD
-      res.json({ result: false, error: 'User already exists' });
-    }
-  });
+        newUser.save().then(savedUser => {
+          res.json({ result: true, user: savedUser });
+        });
+      } else {
+        // Si le user existe déjà dans la BDD
+        res.json({ result: false, error: 'User already exists' });
+      }
+    })
+    .catch(err => {
+      console.error("Error during signup:", err);
+      res.status(500).json({ result: false, error: "Internal server error" });
+    });
 });
 
 
