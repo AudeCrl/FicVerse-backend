@@ -17,15 +17,16 @@ router.post('/signup', (req, res) => { // création d'un nouveau compte user
   }
 
   // On vérifie que le user n'est pas déjà enregistré. Si non, on en créé un nouveau
-  User.findOne({ email: req.body.email }).then(data => {
-    if (data === null) {
-      const hash = bcrypt.hashSync(password, 10);
-
-      const newUser = new User({
-        email,      // suite à la destructuration au début de la route avec const { email, username, password } = req.body;
-        username,
-        password: hash,
-        token: uid2(32),
+  User.findOne({ $or: [{ email: req.body.email }, { username: req.body.username }] })
+    
+    .then(data => {
+      if (data === null) {
+        const hash = bcrypt.hashSync(password, 10);
+        const newUser = new User({
+          email,      // suite à la destructuration au début de la route avec const { email, username, password } = req.body;
+          username,
+          password: hash,
+          token: uid2(32),
       });
 
       newUser.save().then(data => {
