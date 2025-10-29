@@ -13,8 +13,10 @@ const userSchema = new mongoose.Schema({
     themeId: { type: mongoose.Schema.Types.ObjectId, ref: 'themes' }, // plus tard : mettre par défaut l'ObjectId du thème watercolor une fois qu'il sera créé en base
     appearanceMode: { type: String, enum: APPEARANCE_MODES, default: 'system' },
     notationIcon: { type: String, enum: NOTATION_ICON_TYPES, default: 'heart' },
-    createdAt: { type: Date, default: Date.now },
     lastConnectedAt: { type: Date, default: Date.now },
+},
+{
+    timestamps: true,
 });
 
 const User = mongoose.model('User', userSchema);

@@ -21,14 +21,16 @@ const fictionSchema = new mongoose.Schema({
     readingStatus: { type: String, enum: READING_STATUS, required: true },
     storyStatus: { type: String, enum: STORY_STATUS },
     language: { type: languageSchema, required: false },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: Date,
+    lastReadAt: Date,
     image: { type: String, trim: true },
     rate: {
         value: { type: Number, min: 0, max: 5 },
         display: { type: Boolean, default: false },
     },
     lastChapterRead: { type: Number, min: 0, default: 0 },
+},
+{
+    timestamps: true,
 });
 
 fictionSchema.index({ fandomId: 1 });
@@ -48,11 +50,8 @@ fictionSchema.index({ readingStatus: 1 });
 
 // Sort
 fictionSchema.index({ createdAt: -1 });
-fictionSchema.index({ updatedAt: -1 });
+fictionSchema.index({ lastReadAt: -1 });
 fictionSchema.index({ "rate.value": -1 });
-
-// To be confirmed ;-)
-fictionSchema.index({ "language.name": 1 });
 
 const Fiction = mongoose.model('Fiction', fictionSchema);
 
