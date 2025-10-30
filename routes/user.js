@@ -59,4 +59,27 @@ router.post('/signin', (req, res) => { // on se connecte
   });
 });
 
+// Route pour suppprimer un compte
+router.delete('/remove', (req, res) => {
+  const { token } = req.body;
+
+  if (!checkBody(req.body, ['token'])) {
+    res.json({ result: false, error: 'Missing user token' });
+    return;
+  }
+
+  User.deleteOne({ token: token })
+  .then(deleteResult => {
+    if (deleteResult.deletedCount > 0) {
+      res.json({ result: true, message: 'Account successfully deleted' });
+    } else {
+      res.json({ result: false, error: 'User not found' });
+    }
+  })
+  .catch(error => {
+    console.log(('Error during account removal:', error));
+    res.status(500).json({ result: false, error: 'Internat server error during deletion' });    
+  });
+});
+
 module.exports = router;
