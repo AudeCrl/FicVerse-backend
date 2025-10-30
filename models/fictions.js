@@ -33,11 +33,11 @@ const fictionSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-fictionSchema.index({ fandomId: 1 });
+fictionSchema.index({ userId: 1, fandomId: 1 });
 
 // Search by author, or keyword in title
-fictionSchema.index({ author: 1 });
-fictionSchema.index({ title: 1 });
+fictionSchema.index({ userId: 1, author: 1 });
+fictionSchema.index({ userId: 1,  title: 1 });
 
 // Search by keyword in either summary or personalNote
 fictionSchema.index(
