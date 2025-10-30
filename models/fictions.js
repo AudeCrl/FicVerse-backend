@@ -10,6 +10,7 @@ const languageSchema = new mongoose.Schema({
 });
 
 const fictionSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
     title: { type: String, trim: true, required: true },
     link: { type: String, trim: true },
     summary: { type: String, trim: true },

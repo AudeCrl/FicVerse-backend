@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const fandomSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true }, // champ ajouté pour permettre à chaque user d'avoir son propre ordre personnalisé de fandoms. Si validé, alors mettre sur Draw.io
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
   name: { type: String, trim: true, required: true },
   position: Number,
   },
