@@ -61,22 +61,34 @@ router.post('/signin', (req, res) => { // on se connecte
 
 // Route pour suppprimer un compte
 router.delete('/remove', (req, res) => {
-  const { token } = req.body;
+  const { token, password } = req.body;
 
-  if (!checkBody(req.body, ['token'])) {
-    res.json({ result: false, error: 'Missing user token' });
+  if (!checkBody(req.body, ['token', 'password'])) {
+    res.json({ result: false, error: 'Missing token or password' });
     return;
   }
 
-  User.deleteOne({ token: token })
-  .then(deleteResult => {
-    if (deleteResult.deletedCount > 0) {
-      res.json({ result: true, message: 'Account successfully deleted' });
-    } else {
-      res.json({ result: false, error: 'User not found' });
+  User.findOne({ token: token})
+  .then(userToDelete => {
+    if (!userToDelete) {
+      res.json({ result: false, error: 'User not found'});
+      return;
     }
+    if (!bcrypt.compareSync(password, userToDelete.passwordHash)) {
+      res.json({ result: false, error: 'Invalid password confirmation' });
+      return;
+    }
+
+    return User.deleteOne({ token: token })
+      .then(deleteResult => {
+        if (deleteResult.deletedCount > 0) {
+          res.json({ result: true, message: 'Account successfully deleted' });
+        }else {
+          res.json({ result: false, error: 'User deletion failed' });
+        }
+      });
   })
-  .catch(error => {
+    .catch(error => {
     console.log(('Error during account removal:', error));
     res.status(500).json({ result: false, error: 'Internat server error during deletion' });    
   });
