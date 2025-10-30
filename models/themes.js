@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const themeSchema = new mongoose.Schema({
     name: { type: String, trim: true, required: true },
-    image: { type: String, trim: true, required: false },  // je dois mettre une image obligatoirement ou pas ?
+    image: { type: String, trim: true },
+    active: Boolean,
   },
   { timestamps: true }
 );
