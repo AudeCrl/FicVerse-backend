@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 
 const tagSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
     name: { type: String, trim: true, required: true },
     usageCount: { type: Number, default: 0 },
-    color: { type: Number, required: true }, // je mets required: true car j'estime qu'il faudra une couleur obligatoirement par tag. Me corriger si ce n'est pas bon.
+    color: { type: Number, required: true },
   },
   { timestamps: true }
 );
@@ -15,7 +16,10 @@ Même si on a des milliers de tags.
 */
 
 // unique: true me permet d'éviter les doublons incohérents (“romance” / “Romance ” / “Romance❤️”).
-tagSchema.index({ name: 1 }, { unique: true });
+tagSchema.index({ userId: 1, name: 1 }, { unique: true });
+
+// Most used tags
+tagSchema.index({ userId: 1, usageCount: -1 });
 
 const Tag = mongoose.model('Tag', tagSchema);
 

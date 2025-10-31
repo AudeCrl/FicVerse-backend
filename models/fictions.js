@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const STORY_STATUS = ["in-progress", "completed", "one-shot", "abandoned"];
 const READING_STATUS = ["to-read", "reading", "finished"];
 
-const languageSchema = new mongoose.Schema({
+const langSchema = new mongoose.Schema({
     name: { type: String, trim: true, required: true },
     position: Number,
 });
@@ -21,7 +21,7 @@ const fictionSchema = new mongoose.Schema({
     numberOfChapters: { type: Number, min: 0 },
     readingStatus: { type: String, enum: READING_STATUS, required: true },
     storyStatus: { type: String, enum: STORY_STATUS },
-    language: { type: languageSchema, required: false },
+    lang: { type: langSchema, required: false },
     lastReadAt: Date,
     image: { type: String, trim: true },
     rate: {
@@ -47,13 +47,19 @@ fictionSchema.index(
 );
 
 // Filter (Tabs)
-fictionSchema.index({ readingStatus: 1 });
+fictionSchema.index({  userId: 1, readingStatus: 1 });
 
 // Sort
-fictionSchema.index({ createdAt: -1 });
-fictionSchema.index({ lastReadAt: -1 });
-fictionSchema.index({ "rate.value": -1 });
+fictionSchema.index({ userId: 1, createdAt: -1 });
+fictionSchema.index({ userId: 1, lastReadAt: -1 });
+fictionSchema.index({ userId: 1, "rate.value": -1 });
 
-const Fiction = mongoose.model('Fiction', fictionSchema);
+// Languages management
+fictionSchema.index({ userId: 1, "lang.name": 1 });
+
+// GLOBAL COMPOSITE INDEX: All fictions by readingStatus + fandom + sorting by date
+fictionSchema.index({ userId: 1, readingStatus: 1, fandomId: 1, lastReadAt: -1 });
+
+const Fiction = mongoose.model('fictions', fictionSchema);
 
 module.exports = { Fiction };
