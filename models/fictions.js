@@ -62,4 +62,4 @@ fictionSchema.index({ userId: 1, readingStatus: 1, fandomId: 1, lastReadAt: -1 }
 
 const Fiction = mongoose.model('fictions', fictionSchema);
 
-module.exports = { Fiction };
+module.exports = Fiction;

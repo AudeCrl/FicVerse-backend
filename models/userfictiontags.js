@@ -37,7 +37,7 @@ Si je fais une requête pour chercher { userId: U1, tags: T70 }
 MongoDB va directement aller jusqu'à userId = U1 et aller directement à tags = T70.
 */
 
-const UserFictionTag = mongoose.model('UserFictionTag', userFictionTagsSchema);
+const UserFictionTags = mongoose.model('UserFictionTags', userFictionTagsSchema);
 
-module.exports = { UserFictionTag };
+module.exports = UserFictionTags;
 

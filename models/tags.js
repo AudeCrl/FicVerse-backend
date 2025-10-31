@@ -23,4 +23,4 @@ tagSchema.index({ userId: 1, usageCount: -1 });
 
 const Tag = mongoose.model('Tag', tagSchema);
 
-module.exports = { Tag };
+module.exports = Tag;

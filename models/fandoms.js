@@ -14,4 +14,4 @@ fandomSchema.index({ userId: 1, position: 1 });
 
 const Fandom = mongoose.model('Fandom', fandomSchema);
 
-module.exports = { Fandom };
+module.exports = Fandom;

@@ -12,4 +12,4 @@ themeSchema.index({ name: 1 }, { unique: true });
 
 const Theme = mongoose.model('Theme', themeSchema);
 
-module.exports = { Theme };
+module.exports = Theme;
