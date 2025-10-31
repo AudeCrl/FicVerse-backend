@@ -14,7 +14,7 @@ const fictionSchema = new mongoose.Schema({
     title: { type: String, trim: true, required: true },
     link: { type: String, trim: true },
     summary: { type: String, trim: true },
-    personalNote: { type: String, trim: true },
+    personalNotes: { type: String, trim: true },
     author: { type: String, trim: true },
     fandomId: { type: mongoose.Schema.Types.ObjectId, ref: "fandoms", required: true },
     numberOfWords: { type: Number, min: 0 },
