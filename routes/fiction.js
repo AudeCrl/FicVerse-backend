@@ -81,7 +81,7 @@ router.post('/', async (req, res) => {
             author: author || '',
             fandomId,
             summary: summary || '',
-            personalNote: personalNotes || '',
+            personalNotes: personalNotes || '',
             numberOfChapters: numberOfChapters || 0,
             numberOfWords: numberOfWords || 0,
             readingStatus,
@@ -109,6 +109,76 @@ router.post('/', async (req, res) => {
 
     } catch (error) {
         console.error('Error while fetching fictions:', error);
+        return res.status(500).json({ result: false, error: 'Internal server error' });
+    }
+});
+
+// GET /fiction/:readingStatus -> Get fandom with fiction by readingStatus
+router.get('/:readingStatus', async (req, res) => {
+    try {
+        if (!checkBody(req.body, ['token'])) {
+            return res.json({ result: false, error: 'Missing or empty fields in request body' });
+        }
+
+        const { token } = req.body;
+        const { readingStatus } = req.params;
+
+        const allowedStatus = ['to-read', 'reading', 'finished'];
+        if (!allowedStatus.includes(readingStatus)) {
+            return res.json({ result: false, error: 'Invalid readingStatus parameter' });            
+        }
+
+        const user = await User.findOne({ token });
+        if (!user) {
+            return res.status(401).json({ result: false, error: 'Invalid or expired token' });
+        }
+
+        const userId = user._id;
+
+        const pipeline = [
+            //1. Filtrer les fandoms par leur userId
+            { $match: { userId: userId } },
+
+            //2.Trier les fandom par leur propriété 'position' croissant
+            { $sort: { position: 1 } },
+
+            {
+                $lookup: {
+                    from: 'fictions', // Effectue la jointure dans la collection 'fictions'
+                    let: { fandomId: '$_id', userId: userId, readingStatus: readingStatus }, //Variable passé à la sous-pipeline
+                    pipeline: [ //Filtrage des fictions
+                        {
+                            $match: {
+                                $expr: { //Précise les conditions qui valideront la comparaison
+                                    $and: [ //Précise que TOUTES les conditions doivent etre respecté
+                                        { $eq: ['$fandomId', '$$fandomId'] }, //'égalité' prend 2 argument et renvoi true si la condition est respecté ($: info dans la BD, $$: infor transmise par le parent)
+                                        { $eq: ['$userId', '$$userId'] },
+                                        { $eq: ['$readingStatus', '$$readingStatus'] },
+                                    ]
+                                }
+                            }
+                        },
+                        { $sort: { lastReadAt: 1 } }, // Pas d'effet
+                        {
+                            $lookup: {
+                                from: 'userfictiontags',
+                                localField: '_id',
+                                foreignField: 'fictionId',
+                                as: 'tagLinks',
+                            }
+                        },
+                    ],
+                    as: 'fictions' //Stocke le resultat de la pipeline dans un tableau nommé 'fictions'
+                }
+            },
+        ];
+
+        const fandoms = await Fandom.aggregate(pipeline); //Fait un aggregate sur la collection Fandom avec les parametres indiqué dans la pipeline et l'attribue à "fandoms"
+
+        return res.json({ result: true, fandoms });
+
+    } catch (error) {
+        console.error(`Error while fetching fictions for status ${req.params.readingStatus}:`, error);
         return res.status(500).json({ result: false, error: 'Internal server error' });
     }
 });
