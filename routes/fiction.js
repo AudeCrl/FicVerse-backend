@@ -29,7 +29,7 @@ router.post('/', async (req, res) => {
             lastChapterRead,
             storyStatus,
             image,
-            tags, // array of tag names (strings)
+            tags, // array of tag ids
             rate, // object { value: Number, display: Boolean }
         } = req.body;
 
@@ -103,9 +103,6 @@ router.post('/', async (req, res) => {
 
         // Everything went fine
         return res.json({ result: true, message: "Fiction created successfully", fiction: newFiction });
-
-        //return res.status(401).json({ result: false, error: 'Invalid or expired token' });
-
 
     } catch (error) {
         console.error('Error while fetching fictions:', error);
