@@ -110,15 +110,12 @@ router.post('/', async (req, res) => {
     }
 });
 
-// GET /fiction/:readingStatus -> Get fandom with fiction by readingStatus
+// GET /fiction?readingStatus&srt=rate&order=desc= -> Get fandom with fiction by readingStatus
 router.get('/:readingStatus', async (req, res) => {
-    try {
-        if (!checkBody(req.body, ['token'])) {
-            return res.json({ result: false, error: 'Missing or empty fields in request body' });
-        }
-
-        const { token } = req.body;
+    try {        
         const { readingStatus } = req.params;
+        const authHeader = req.headers.authorization;
+        const token = authHeader?.split(' ')[1];
 
         const allowedStatus = ['to-read', 'reading', 'finished'];
         if (!allowedStatus.includes(readingStatus)) {
@@ -155,7 +152,7 @@ router.get('/:readingStatus', async (req, res) => {
                                 }
                             }
                         },
-                        { $sort: { lastReadAt: 1 } }, // Pas d'effet
+                        { $sort: { lastReadAt: -1 } },
                         {
                             $lookup: {
                                 from: 'userfictiontags',
@@ -164,10 +161,70 @@ router.get('/:readingStatus', async (req, res) => {
                                 as: 'tagLinks',
                             }
                         },
+                        {
+                            $project: {
+                                tagsIdArray: {
+                                    $reduce:{
+                                        input: "$tagLinks.tags",
+                                        initialValue: [],
+                                        in: { $concatArrays: ['$$value', '$$this']}
+                                    }
+                                },
+                                // Inclure touts les autres champs de la fiction
+                                _id: 1, userId: 1, title: 1, link: 1, summary: 1, personalNotes: 1, author: 1, fandomId: 1, 
+                                numberOfWords: 1, numberOfChapters: 1, readingStatus: 1, storyStatus: 1, lang: 1, 
+                                lastReadAt: 1, image: 1, rate: 1, lastChapterRead: 1, createdAt: 1, updatedAt: 1, __v: 1
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: 'tags',
+                                localField: 'tagsIdArray',
+                                foreignField: '_id',
+                                as: 'tags',
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 1, 
+                                userId: 1,
+                                title: 1,
+                                link: 1,
+                                summary: 1,
+                                author: 1,
+                                fandomId: 1,
+                                numberOfWords: 1,
+                                numberOfChapters: 1,
+                                readingStatus: 1,
+                                storyStatus: 1,
+                                lastReadAt: 1,
+                                image: 1,
+                                rate: 1,
+                                lastChapterRead: 1,
+                                createdAt: 1,
+                                updatedAt: 1,
+                                lang: '$lang.name', //On garde que le nom de la langue
+                                personalNotes: 1,
+                                tags: {
+                                    $map: {
+                                        input: '$tags',
+                                        as: 'tag',
+                                        in: {
+                                            name: '$$tag.name',
+                                            color: '$$tag.color',
+                                            count: '$$tag.usageCount',
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     ],
                     as: 'fictions' //Stocke le resultat de la pipeline dans un tableau nommé 'fictions'
                 }
             },
+            {
+                $match: { 'fictions': { $ne: [] } } //Garde tout ce qui n'est pas egal à [] (ne garde pas le fandoms si il ne contient pas de fiction)
+            },            
         ];
 
         const fandoms = await Fandom.aggregate(pipeline); //Fait un aggregate sur la collection Fandom avec les parametres indiqué dans la pipeline et l'attribue à "fandoms"
