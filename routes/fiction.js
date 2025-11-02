@@ -114,7 +114,7 @@ router.post('/', async (req, res) => {
 router.get('/:readingStatus', async (req, res) => {
     try {        
         const { readingStatus } = req.params;
-        let { srt: sortType, order } = req.query;
+        const { srt, order } = req.query;
         
         const authHeader = req.headers.authorization;
         const token = authHeader?.split(' ')[1];
@@ -135,14 +135,20 @@ router.get('/:readingStatus', async (req, res) => {
 
         const userId = user._id;
 
-        /*
+        let sortType = srt;
+        let sortOrder = (order?.toLowerCase() === 'asc') ? 1 : -1; //Conversion ordre en tri en number
+
+        if (!sortType) {
+            sortType = 'lastReadAt';
+        }
+        
         const allowedSortTypes = ['title', 'author', 'numberOfWords', 'lastReadAt', 'createdAt']; // A activer quand vu avec le front //Type de tri authorisé
 
         // Erreur si le type de tri n'est pas authorisé
-        if ( !allowedSortTypes.includes(sortType) ) {
+        if ( sortType && !allowedSortTypes.includes(sortType) ) {
             return res.json({ result : false, error: 'This sort type is not allowed' });
         };
-        */
+        
 
         //rate deviens rate.value car c'est un sous document
         if (sortType === 'rate') {
@@ -150,8 +156,9 @@ router.get('/:readingStatus', async (req, res) => {
         }
 
         
-        const sortOrder = (order?.toLowerCase() === 'asc') ? 1 : -1; //Conversion ordre en tri en number
+        
         const sort = { [sortType]: sortOrder } //Création du tri qui sera dans la pipeline
+        console.log('Sort type :', sort);
         
 
         const pipeline = [
