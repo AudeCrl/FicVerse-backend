@@ -141,13 +141,14 @@ router.get('/:readingStatus', async (req, res) => {
         if (!sortType) {
             sortType = 'lastReadAt';
         }
-        
-        const allowedSortTypes = ['title', 'author', 'numberOfWords', 'lastReadAt', 'createdAt']; // A activer quand vu avec le front //Type de tri authorisé
+        /*
+        const allowedSortTypes = ['title', 'author', 'numberOfWords', 'lastReadAt', 'createdAt', 'rate']; // A activer quand vu avec le front //Type de tri authorisé
 
         // Erreur si le type de tri n'est pas authorisé
         if ( sortType && !allowedSortTypes.includes(sortType) ) {
             return res.json({ result : false, error: 'This sort type is not allowed' });
         };
+        */
         
 
         //rate deviens rate.value car c'est un sous document
