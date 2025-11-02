@@ -210,6 +210,16 @@ router.get('/:readingStatus', async (req, res) => {
                             }
                         },
                         {
+                            $addFields: { //Permet d'ecraser le contenu du tableau 'tags' créé à l'étape précedente
+                                tags: { //Tableau recevant le resultat du tri
+                                    $sortArray: { //Permet de trié le contenu d'un tableau
+                                        input: '$tags', //Le tableau ajouté pour le tri
+                                        sortBy: { usageCount: -1, name: 1 } //Le type de tri voulu
+                                    }
+                                }
+                            }
+                        },
+                        {
                             $project: {
                                 _id: 1, 
                                 userId: 1,
