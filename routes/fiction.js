@@ -253,6 +253,7 @@ router.get('/:readingStatus', async (req, res) => {
                                         input: '$tags',
                                         as: 'tag',
                                         in: {
+                                            _id: '$$tag._id',
                                             name: '$$tag.name',
                                             color: '$$tag.color',
                                             count: '$$tag.usageCount',
