@@ -110,12 +110,18 @@ router.post('/', async (req, res) => {
     }
 });
 
-// GET /fiction?readingStatus&srt=rate&order=desc= -> Get fandom with fiction by readingStatus
+// GET /fiction/:readingStatus?&srt=rate&order=desc= -> Get fandom with fiction by readingStatus
 router.get('/:readingStatus', async (req, res) => {
     try {        
         const { readingStatus } = req.params;
+        let { srt: sortType, order } = req.query;
+        
         const authHeader = req.headers.authorization;
         const token = authHeader?.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({ result: false, error: 'Missing token in Authorization header' });
+        }
 
         const allowedStatus = ['to-read', 'reading', 'finished'];
         if (!allowedStatus.includes(readingStatus)) {
@@ -128,6 +134,25 @@ router.get('/:readingStatus', async (req, res) => {
         }
 
         const userId = user._id;
+
+        /*
+        const allowedSortTypes = ['title', 'author', 'numberOfWords', 'lastReadAt', 'createdAt']; // A activer quand vu avec le front //Type de tri authorisé
+
+        // Erreur si le type de tri n'est pas authorisé
+        if ( !allowedSortTypes.includes(sortType) ) {
+            return res.json({ result : false, error: 'This sort type is not allowed' });
+        };
+        */
+
+        //rate deviens rate.value car c'est un sous document
+        if (sortType === 'rate') {
+            sortType = 'rate.value';
+        }
+
+        
+        const sortOrder = (order?.toLowerCase() === 'asc') ? 1 : -1; //Conversion ordre en tri en number
+        const sort = { [sortType]: sortOrder } //Création du tri qui sera dans la pipeline
+        
 
         const pipeline = [
             //1. Filtrer les fandoms par leur userId
@@ -152,7 +177,7 @@ router.get('/:readingStatus', async (req, res) => {
                                 }
                             }
                         },
-                        { $sort: { lastReadAt: -1 } },
+                        { $sort: sort }, //Tri créé précedement
                         {
                             $lookup: {
                                 from: 'userfictiontags',
