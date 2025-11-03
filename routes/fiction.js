@@ -110,7 +110,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-// GET /fiction/:readingStatus?&srt=rate&order=desc= -> Get fandom with fiction by readingStatus
+// GET /fiction/:readingStatus?srt=rate&order=desc -> Get fandom with fiction by readingStatus
 router.get('/:readingStatus', async (req, res) => {
     try {        
         const { readingStatus } = req.params;
