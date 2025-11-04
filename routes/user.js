@@ -5,6 +5,15 @@ const { User } = require('../models/users');
 const { checkBody } = require('../modules/checkBody');
 const uid2 = require('uid2');
 const bcrypt = require('bcrypt');
+const expressFileUpload = require('express-fileupload'); // Pour gérer le fichier
+const cloudinary = require('cloudinary').v2;
+const fs = require('fs');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 
 router.post('/signup', (req, res) => { // création d'un nouveau compte user
@@ -52,7 +61,7 @@ router.post('/signin', (req, res) => { // on se connecte
 
   User.findOne({ email: req.body.email }).then(data => { // on regarde si le user existe déjà
     if (data && bcrypt.compareSync(req.body.password, data.passwordHash)) {
-      res.json({ result: true, token: data.token, email: data.email, username: data.username, createdAt: data.createdAt });
+      res.json({ result: true, token: data.token, email: data.email, username: data.username, createdAt: data.createdAt, avatarURL: data.avatarURL });
     } else {
       res.json({ result: false, error: 'User not found or wrong password' });
     }
@@ -92,6 +101,61 @@ router.delete('/remove', (req, res) => {
     console.log(('Error during account removal:', error));
     res.status(500).json({ result: false, error: 'Internat server error during deletion' });    
   });
+});
+
+//Upload de l'avatar de l'utilisateur
+router.patch('/upload', async (req, res) => {
+  // console.log(req.files.avatarFromFront);
+  let tempFilePath = null;  
+
+  try {
+    //Authentification via le bearer token
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ result: false, error: 'Missing token in Authorization header' });
+    }
+
+    const userToUpdate = await User.findOne({ token });
+
+    if (!userToUpdate) {
+      return res.status(404).json({ result: false, error: 'User not found or token invalid' });
+    }
+
+    //Vérification et upload du fichier
+    if (!req.files || !req.files.avatarFromFront) {
+      return res.json({ result: false, error: 'Avatar file missing' });
+    }
+    const file = req.files.avatarFromFront;
+
+    const path = require('path');
+    tempFilePath = path.join('./tmp', `avatar-${file.name}`);    
+
+    await file.mv(tempFilePath);
+
+    const resultCloudinary = await cloudinary.uploader.upload(tempFilePath, {
+      folder: 'ficverse/avatars',
+    });
+
+    userToUpdate.avatarURL = resultCloudinary.secure_url;
+    const saveReply = await userToUpdate.save(); //Equivalent de User.updateOne    
+
+    fs.unlinkSync(tempFilePath) //Suppression du fichier temporaire
+
+    res.json({
+      result: true,
+      message: 'Avatar Updated successfully',
+      avatarUrl: userToUpdate.avatarURL
+    });
+  } catch (error) {
+    console.error('Error during avatar upload:', error);
+
+    if (tempFilePath && fs.existsSync(tempFilePath)) { //Verifie si le fichier existe
+      fs.unlink(tempFilePath)
+    }
+    res.status(500).json({ result: false, error: 'Internal server error during upload'});    
+  }
 });
 
 module.exports = router;
