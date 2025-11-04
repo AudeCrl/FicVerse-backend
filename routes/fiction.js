@@ -6,6 +6,7 @@ const { User } = require('../models/users');
 const Fiction = require('../models/fictions');
 const Fandom = require('../models/fandoms');
 const UserFictionTags = require('../models/userfictiontags');
+const Tag = require('../models/tags');
 
 // POST /fiction -> CREATE A FICTION
 router.post('/', async (req, res) => {
@@ -111,7 +112,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /fiction/:readingStatus?srt=rate&order=desc -> Get fandom with fiction by readingStatus
-router.get('/:readingStatus', async (req, res) => {
+router.get('/status/:readingStatus', async (req, res) => {
     try {        
         const { readingStatus } = req.params;
         const { srt, order } = req.query;
@@ -256,7 +257,7 @@ router.get('/:readingStatus', async (req, res) => {
                                             _id: '$$tag._id',
                                             name: '$$tag.name',
                                             color: '$$tag.color',
-                                            count: '$$tag.usageCount',
+                                            usageCount: '$$tag.usageCount',
                                         }
                                     }
                                 }
@@ -279,6 +280,89 @@ router.get('/:readingStatus', async (req, res) => {
         console.error(`Error while fetching fictions for status ${req.params.readingStatus}:`, error);
         return res.status(500).json({ result: false, error: 'Internal server error' });
     }
+});
+
+
+// GET /fictions/:id -> retourne la fiction complète avec ses tags
+router.get("/:id", async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    if (!token) return res.status(401).json({ result: false, error: "Missing token" });
+
+    const user = await User.findOne({ token });
+    if (!user) return res.status(401).json({ result: false, error: "Invalid token" });
+
+    const fictionId = req.params.id;
+
+    // On cherche la fiction correspondant au user
+    const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id }).lean();
+    if (!fiction) return res.status(404).json({ result: false, error: "Fiction not found" });
+
+    // On récupère les tags associés à cette fiction
+    const link = await UserFictionTags.findOne({ userId: user._id, fictionId }).lean();
+
+    let tags = [];
+    if (link && link.tags.length > 0) {
+      tags = await Tag.find({ _id: { $in: link.tags } })
+        .sort({ usageCount: -1, name: 1 })
+        .lean();
+    }
+
+    // On attache les tags au résultat final
+    fiction.tags = tags;
+
+    return res.json({ result: true, fiction });
+  } catch (error) {
+    console.error("GET /fictions/:id failed:", error);
+    return res.status(500).json({ result: false, error: "Internal server error" });
+  }
+});
+
+
+// PUT /fictions/:id/tags -> remplace la liste des tags d’une fiction et met à jour usageCount
+router.put("/:id/tags", async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    if (!token) return res.status(401).json({ result: false, error: "Missing token" });
+
+    const user = await User.findOne({ token });
+    if (!user) return res.status(401).json({ result: false, error: "Invalid token" });
+
+    const fictionId = req.params.id;
+    const tagIds = Array.isArray(req.body.tagIds) ? req.body.tagIds : [];
+
+    const link = await UserFictionTags.findOne({ userId: user._id, fictionId });
+    const oldTagIds = link ? link.tags.map(id => id.toString()) : [];
+
+    const newTagIds = tagIds.map(id => id.toString());
+
+    // Calcul du diff simple
+    const added = newTagIds.filter(id => !oldTagIds.includes(id));
+    const removed = oldTagIds.filter(id => !newTagIds.includes(id));
+
+    // Upsert de la liaison
+    await UserFictionTags.findOneAndUpdate(
+      { userId: user._id, fictionId },
+      { $set: { tags: newTagIds } },
+      { upsert: true }
+    );
+
+    // Mise à jour usageCount
+    if (added.length > 0) {
+      await Tag.updateMany({ _id: { $in: added } }, { $inc: { usageCount: 1 } });
+    }
+    if (removed.length > 0) {
+      await Tag.updateMany(
+        { _id: { $in: removed }, usageCount: { $gt: 0 } },
+        { $inc: { usageCount: -1 } }
+      );
+    }
+
+    return res.json({ result: true });
+  } catch (error) {
+    console.error("PUT /fictions/:id/tags failed:", error);
+    return res.status(500).json({ result: false, error: "Internal server error" });
+  }
 });
 
 module.exports = router;

@@ -3,7 +3,7 @@ var router = express.Router();
 const { User } = require('../models/users');
 const Tag = require('../models/tags');
 
-// GET /tags -> tous les tags du user connecté
+// GET /tag -> tous les tags du user connecté
 router.get("/", async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
@@ -20,6 +20,41 @@ router.get("/", async (req, res) => {
 
   } catch (error) {
     console.error("GET /tags failed:", error);
+    return res.status(500).json({ result: false, error: "Internal server error" });
+  }
+});
+
+// POST /tag -> créer un tag orphelin
+router.post("/", async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    if (!token) return res.status(401).json({ result: false, error: "Missing token" });
+
+    const user = await User.findOne({ token });
+    if (!user) return res.status(401).json({ result: false, error: "Invalid token" });
+
+    const rawName = req.body.name;
+    if (!rawName || typeof rawName !== "string" || !rawName.trim()) {
+      return res.status(400).json({ result: false, error: "Missing tag name" });
+    }
+
+    const name = rawName.trim().toLowerCase();
+
+    // Vérifie si le tag existe déjà
+    let tag = await Tag.findOne({ userId: user._id, name });
+
+    if (!tag) {    // Si le tag n'existe pas, on le crée
+      tag = await new Tag({
+        userId: user._id,
+        name,
+        usageCount: 0,
+        color: 1,
+      }).save();
+    }
+
+    return res.json({ result: true, tag });
+  } catch (error) {
+    console.error("POST /tags failed:", error);
     return res.status(500).json({ result: false, error: "Internal server error" });
   }
 });
