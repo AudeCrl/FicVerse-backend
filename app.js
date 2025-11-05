@@ -10,6 +10,7 @@ var userRouter = require('./routes/user');
 var fandomRouter = require('./routes/fandom');
 var fictionRouter = require('./routes/fiction');
 var tagRouter = require('./routes/tag');
+var fandomRouter = require('./routes/fandom');
 
 const fileUpload = require('express-fileupload');
 
@@ -31,5 +32,6 @@ app.use('/user', userRouter);
 app.use('/fandom', fandomRouter);  
 app.use('/fiction', fictionRouter);
 app.use('/tag', tagRouter);
+app.use('/fandom', fandomRouter);
 
 module.exports = app;

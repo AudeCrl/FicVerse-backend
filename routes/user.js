@@ -158,4 +158,98 @@ router.patch('/upload', async (req, res) => {
   }
 });
 
+router.patch('/username', async (req, res) => {
+  try {
+    //Authentification via le bearer token
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ result: false, error: 'Missing token in Authorization header' });
+    }
+
+    const userToUpdate = await User.findOne({ token });
+
+    if (!userToUpdate) {
+      return res.status(404).json({ result: false, error: 'User not found or token invalid' });
+    }
+    
+    //Recuperation des infos du front
+    const newUsername = req.body.username.trim();
+
+    if (!newUsername || newUsername.length === 0) {
+            return res.json({ result: false, error: 'New username cannot be empty' });
+        }
+
+    const existingUser = await User.findOne({ username: newUsername });
+    if (existingUser && existingUser.token !== token) {
+      return res.json({ result: false, error: 'This username is already taken'});
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { token },
+      { username: newUsername },
+      { new: true } //renvoi le document mis à jour plutot que l'ancien document
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ result: false, error: 'User not found or token invalid' });
+    }
+
+    res.json({ result: true, message: 'Username updated successfully', username: updatedUser.username });
+
+  } catch (error) {
+    console.error('Error updating username:', error);
+    res.status(500).json({ result: false, error: 'Internal server error during username update'});
+    
+  }
+});
+
+router.patch('/email', async (req, res) => {
+  try {
+    //Authentification via le bearer token
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ result: false, error: 'Missing token in Authorization header' });
+    }
+
+    const userToUpdate = await User.findOne({ token });
+
+    if (!userToUpdate) {
+      return res.status(404).json({ result: false, error: 'User not found or token invalid' });
+    }
+    
+    //Recuperation des infos du front
+    const newEmail = req.body.email.trim();
+
+    if (!newEmail || newEmail.length === 0) {
+            return res.json({ result: false, error: 'New email cannot be empty' });
+        }
+
+    const existingUser = await User.findOne({ email: newEmail });
+    if (existingUser && existingUser.token !== token) {
+      return res.json({ result: false, error: 'This email is already use'});
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { token },
+      { email: newEmail },
+      { new: true } //renvoi le document mis à jour plutot que l'ancien document
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ result: false, error: 'User not found or token invalid' });
+    }
+
+    res.json({ result: true, message: 'Email updated successfully', email: updatedUser.email });
+
+  } catch (error) {
+    console.error('Error updating email:', error);
+    res.status(500).json({ result: false, error: 'Internal server error during email update'});
+    
+  }
+})
+
 module.exports = router;
