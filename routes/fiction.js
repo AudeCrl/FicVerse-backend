@@ -8,108 +8,6 @@ const Fandom = require('../models/fandoms');
 const UserFictionTags = require('../models/userfictiontags');
 const Tag = require('../models/tags');
 
-// POST /fiction -> CREATE A FICTION
-router.post('/', async (req, res) => {
-    try {
-        // Check required fields
-        if (!checkBody(req.body, ['token', 'fandomName', 'title', 'readingStatus', 'storyStatus']))
-            return res.json({ result: false, error: 'Missing or empty fields' });
-
-        const { 
-            token, 
-            fandomName, 
-            title, 
-            link, 
-            author,
-            langName,
-            summary, 
-            personalNotes,
-            numberOfChapters,
-            numberOfWords,
-            readingStatus,
-            lastChapterRead,
-            storyStatus,
-            image,
-            tags, // array of tag ids
-            rate, // object { value: Number, display: Boolean }
-        } = req.body;
-
-        // Verify user's token
-        const user = await User.findOne({ token });
-        if (!user) return res.status(401).json({ result: false, error: 'Invalid or expired token' });
-        
-        const userId = user._id;
-        
-        // FANDOM: Check if it exists or create it
-        let newFandom;
-        const existingFandom = await Fandom.findOne({ userId, name: fandomName });
-        if (!existingFandom) {
-            // If not we have to create it in the Fandoms collection, with a position equal to nb of docs in the collection + 1
-            const fandomPosition = (await Fandom.countDocuments({ userId })) + 1;
-            newFandom = await new Fandom({
-                userId, 
-                name: fandomName, 
-                position: fandomPosition,                
-            }).save();            
-        }
-        const fandomId = existingFandom ? existingFandom._id : newFandom._id;
-
-        // LANG: Find or assign position
-        let langPosition;
-        const existingLang = await Fiction.findOne({ userId, 'lang.name': langName });
-        if (existingLang) {
-            langPosition = existingLang.lang.position;
-        } else {
-            const distinctlangs = await Fiction.distinct('lang.name', { userId });
-            langPosition = distinctlangs.length + 1;
-        }
-        const lang = { name: langName, position: langPosition };
-
-        // Model.distinct(<champ>, <filtre>)
-        // - <champ> : le champ dont on veut récupérer les valeurs uniques
-        //   → ici "lang.name", car lang est un sous-document.
-        // - <filtre> (optionnel) : un objet de conditions, comme pour find()
-        //   -> ici { userId }, pour ne récupérer que les langues de cet utilisateur précis.
-        
-        // LASTREADAT: If lastChapterRead is filled in, set lastReadAt to now
-        const lastReadAt = lastChapterRead > 0 ? new Date() : null;
-
-        // Create NEW FICTION
-        const newFiction = await new Fiction({
-            userId,
-            title,
-            link: link || '',
-            author: author || '',
-            fandomId,
-            summary: summary || '',
-            personalNotes: personalNotes || '',
-            numberOfChapters: numberOfChapters || 0,
-            numberOfWords: numberOfWords || 0,
-            readingStatus,
-            storyStatus,
-            lang,
-            lastReadAt,
-            image: image || '',
-            rate: {
-                value: rate?.value || 0,
-                display: rate?.display ?? false,
-            },
-            lastChapterRead: lastChapterRead || 0,
-        }).save();
-
-        // TAGS: create a doc. in userfictiontags only if there are tags
-        if (tags && tags.length > 0) {
-            await UserFictionTags.create({ userId, fictionId: newFiction._id, tags });
-        }
-
-        // Everything went fine
-        return res.json({ result: true, message: "Fiction created successfully", fiction: newFiction });
-
-    } catch (error) {
-        console.error('Error while fetching fictions:', error);
-        return res.status(500).json({ result: false, error: 'Internal server error' });
-    }
-});
 
 // GET /fiction/:readingStatus?srt=rate&order=desc -> Get fandom with fiction by readingStatus
 router.get('/status/:readingStatus', async (req, res) => {
@@ -151,13 +49,10 @@ router.get('/status/:readingStatus', async (req, res) => {
         };
         */
         
-
         //rate deviens rate.value car c'est un sous document
         if (sortType === 'rate') {
             sortType = 'rate.value';
         }
-
-        
         
         const sort = { [sortType]: sortOrder } //Création du tri qui sera dans la pipeline
         console.log('Sort type :', sort);
@@ -283,7 +178,153 @@ router.get('/status/:readingStatus', async (req, res) => {
 });
 
 
-// GET /fictions/:id -> retourne la fiction complète avec ses tags
+// GET /fiction/language  =>  { result:true, languages:[{ name, position }] }
+router.get("/lang", async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
+
+    const user = await User.findOne({ token });
+    if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
+
+    const userId = user._id;
+
+    // Agrège dans la collection des fictions du user : lang est un sous-doc { name, position }
+    const rows = await Fiction.aggregate([
+      { $match: { userId } },    // On ne regarde que les documents de cet utilisateur
+      { $match: { lang: { $exists: true, $ne: null } } },    // On ne regarde que les fictions ayant le champ "lang"
+      {
+        $project: {
+          name: "$lang.name",                               // récupère directement le nom
+          position: { $ifNull: ["$lang.position", 9999] },  // si pas de position, met 9999
+          },
+      },
+      { $match: { name: { $type: "string", $ne: "" } } },   // $ne veut dire "non equal to", "différent de"
+      {
+        $group: {                                           // pour chaque name, on garde la plus petite position rencontrée
+          _id: { $toLower: "$name" },                       // on met name en minuscule via $toLower
+          name: { $first: "$name" },                        // puis on garde uniquement la 1ère occurrence de ce name via $first
+          position: { $min: "$position" },                  // puis on le met à la plus petite position possible via $min
+        },
+      },
+      { $sort: { position: 1, name: 1 } },
+    ]);
+
+    res.json({ result: true, languages: rows.map(({ name, position }) => ({ name, position })) });
+  } catch (error) {
+    console.error("GET /fiction/language failed", error);
+    res.status(500).json({ result: false, error: "Internal error" });
+  }
+});
+
+
+// POST /fiction -> CREATE A FICTION
+router.post('/', async (req, res) => {
+    try {
+        // Check required fields
+        const token = req.headers.authorization.split(' ')[1];
+        if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
+    
+        if (!checkBody(req.body, ['fandomName', 'title', 'readingStatus', 'storyStatus']))
+            return res.json({ result: false, error: 'Missing or empty fields' });
+
+        const {  
+            fandomName, 
+            title, 
+            link, 
+            author,
+            langName,
+            summary, 
+            personalNotes,
+            numberOfChapters,
+            numberOfWords,
+            readingStatus,
+            lastChapterRead,
+            storyStatus,
+            image,
+            tags, // array of tag ids
+            rate, // object { value: Number, display: Boolean }
+        } = req.body;
+
+        // Verify user's token
+        const user = await User.findOne({ token });
+        if (!user) return res.status(401).json({ result: false, error: 'Invalid or expired token' });
+        
+        const userId = user._id;
+        
+        // FANDOM: Check if it exists or create it
+        let newFandom;
+        const existingFandom = await Fandom.findOne({ userId, name: fandomName });
+        if (!existingFandom) {
+            // If not we have to create it in the Fandoms collection, with a position equal to nb of docs in the collection + 1
+            const fandomPosition = (await Fandom.countDocuments({ userId })) + 1;
+            newFandom = await new Fandom({
+                userId, 
+                name: fandomName, 
+                position: fandomPosition,                
+            }).save();            
+        }
+        const fandomId = existingFandom ? existingFandom._id : newFandom._id;
+
+        // LANG: Find or assign position
+        let langPosition;
+        const existingLang = await Fiction.findOne({ userId, 'lang.name': langName });
+        if (existingLang) {
+            langPosition = existingLang.lang.position;
+        } else {
+            const distinctlangs = await Fiction.distinct('lang.name', { userId });
+            langPosition = distinctlangs.length + 1;
+        }
+        const lang = { name: langName, position: langPosition };
+
+        // Model.distinct(<champ>, <filtre>)
+        // - <champ> : le champ dont on veut récupérer les valeurs uniques
+        //   → ici "lang.name", car lang est un sous-document.
+        // - <filtre> (optionnel) : un objet de conditions, comme pour find()
+        //   -> ici { userId }, pour ne récupérer que les langues de cet utilisateur précis.
+        
+        // LASTREADAT: If lastChapterRead is filled in, set lastReadAt to now
+        const lastReadAt = lastChapterRead > 0 ? new Date() : null;
+
+        // Create NEW FICTION
+        const newFiction = await new Fiction({
+            userId,
+            title,
+            link: link || '',
+            author: author || '',
+            fandomId,
+            summary: summary || '',
+            personalNotes: personalNotes || '',
+            numberOfChapters: numberOfChapters || 0,
+            numberOfWords: numberOfWords || 0,
+            readingStatus,
+            storyStatus,
+            lang,
+            lastReadAt,
+            image: image || '',
+            rate: {
+                value: rate?.value || 0,
+                display: rate?.display ?? false,
+            },
+            lastChapterRead: lastChapterRead || 0,
+        }).save();
+
+        // TAGS: create a doc. in userfictiontags only if there are tags
+        if (tags && tags.length > 0) {
+            await UserFictionTags.create({ userId, fictionId: newFiction._id, tags });
+        }
+
+        // Everything went fine
+        return res.json({ result: true, message: "Fiction created successfully", fiction: newFiction });
+
+    } catch (error) {
+        console.error('Error while fetching fictions:', error);
+        return res.status(500).json({ result: false, error: 'Internal server error' });
+    }
+});
+
+
+// GET /fiction/:id -> retourne la fiction complète avec ses tags
 router.get("/:id", async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
@@ -294,74 +335,137 @@ router.get("/:id", async (req, res) => {
 
     const fictionId = req.params.id;
 
-    // On cherche la fiction correspondant au user
-    const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id }).lean();
+    const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id }).lean();     // On récupère la fiction (et donc ses champs) associée à ce user. Et lean() nous le donne sous le format d'un objet JavaScript
     if (!fiction) return res.status(404).json({ result: false, error: "Fiction not found" });
 
-    // On récupère les tags associés à cette fiction
-    const link = await UserFictionTags.findOne({ userId: user._id, fictionId }).lean();
+    const fandom = await Fandom.findOne({ _id: fiction.fandomId, userId: user._id }).lean(); // On récupère le nom du fandom
+    fiction.fandomName = fandom.name;  // pour être aligné avec le fetch sur le front qui fait setFandomName(data.fiction.fandomName);
+
+    const link = await UserFictionTags.findOne({ userId: user._id, fictionId }).lean(); // On récupère les informations du document couplant cette fiction avec ce user dans UserFictionTags
 
     let tags = [];
-    if (link && link.tags.length > 0) {
-      tags = await Tag.find({ _id: { $in: link.tags } })
-        .sort({ usageCount: -1, name: 1 })
+    if (link && link.tags.length > 0) {   // Si on récupère ce document et que dedans le tableau d'id des tags n'est pas vide
+      tags = await Tag.find({ _id: { $in: link.tags } })  // Alors on récupère les tags (et leurs champs associés) qui ont cet id. ({ _id: { $in: link.tags } }) veut dire qu'on récupère tous les _id présents dans link.tags
+        .sort({ usageCount: -1, name: 1 }) // les tags sont triés par usageCount et ordre alphabétique
         .lean();
     }
 
-    // On attache les tags au résultat final
-    fiction.tags = tags;
+    fiction.tags = tags;  // tags envoyés au front
 
     return res.json({ result: true, fiction });
+
   } catch (error) {
-    console.error("GET /fictions/:id failed:", error);
+    console.error("GET /fiction/:id failed:", error);
     return res.status(500).json({ result: false, error: "Internal server error" });
   }
 });
 
 
-// PUT /fictions/:id/tags -> remplace la liste des tags d’une fiction et met à jour usageCount
-router.put("/:id/tags", async (req, res) => {
+// PUT /fiction/:id -> met à jour les champs de la fiction
+router.put('/:id', async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
-    if (!token) return res.status(401).json({ result: false, error: "Missing token" });
+    if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
 
     const user = await User.findOne({ token });
-    if (!user) return res.status(401).json({ result: false, error: "Invalid token" });
+    if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
 
     const fictionId = req.params.id;
-    const tagIds = Array.isArray(req.body.tagIds) ? req.body.tagIds : [];
+    const {
+      fandomName,
+      title,
+      link,
+      author,
+      langName,
+      summary,
+      personalNotes,
+      numberOfChapters,
+      numberOfWords,
+      readingStatus,
+      lastChapterRead,
+      storyStatus,
+      image,
+      rate,
+      tagIds, // tableau d’IDs des tags
+    } = req.body;
 
-    const link = await UserFictionTags.findOne({ userId: user._id, fictionId });
-    const oldTagIds = link ? link.tags.map(id => id.toString()) : [];
+    let fandomId;  // Fandom : créer si inexistant
+    if (typeof fandomName === 'string' && fandomName.trim()) {
+      const existingFandom = await Fandom.findOne({ userId: user._id, name: fandomName });
+      if (existingFandom) {
+        fandomId = existingFandom._id;
+      } else {
+        const positionFandom = (await Fandom.countDocuments({ userId: user._id })) + 1;     //Si l’utilisateur a déjà 3 fandoms, alors positionFandom = 4. On lui assigne sa future position puis on crée le nouveau fandom
+        const newFandom = await new Fandom({ userId: user._id, name: fandomName, position: positionFandom }).save();
+        fandomId = newFandom._id;
+      }
+    }
 
-    const newTagIds = tagIds.map(id => id.toString());
+    let lang;       // Langue : créer si nouvelle
+    if (typeof langName === 'string' && langName.trim()) {
+      const existingLang = await Fiction.findOne({ userId: user._id, 'lang.name': langName });
+      const langPosition = existingLang ? existingLang.lang.position : (await Fiction.distinct('lang.name', { userId: user._id })).length + 1; // ce await veut dire : envoie toutes les langues distinctes (sans doublons) du champ "name" dans Fiction et pour uniquement ce user
+      lang = { name: langName, position: langPosition }; // et .length + 1 lui aura indiqué sa nouvelle position dans l'ordre d'affichage
+    }
 
-    // Calcul du diff simple
-    const added = newTagIds.filter(id => !oldTagIds.includes(id));
-    const removed = oldTagIds.filter(id => !newTagIds.includes(id));
+    const update = {};     // Construction dynamique de la mise à jour
+    if (title !== undefined) update.title = title;
+    if (link !== undefined) update.link = link;
+    if (author !== undefined) update.author = author;
+    if (summary !== undefined) update.summary = summary;
+    if (personalNotes !== undefined) update.personalNotes = personalNotes;
+    if (numberOfChapters !== undefined) update.numberOfChapters = numberOfChapters;
+    if (numberOfWords !== undefined) update.numberOfWords = numberOfWords;
+    if (readingStatus !== undefined) update.readingStatus = readingStatus;
+    if (storyStatus !== undefined) update.storyStatus = storyStatus;
+    if (image !== undefined) update.image = image;
+    if (rate !== undefined) update.rate = { value: rate?.value || 0, display: !!rate?.display };
+    if (fandomId) update.fandomId = fandomId;
+    if (lang) update.lang = lang;
+    if (lastChapterRead !== undefined) {
+      update.lastChapterRead = lastChapterRead;
+      update.lastReadAt = lastChapterRead > 0 ? new Date() : null;
+    }
 
-    // Upsert de la liaison
-    await UserFictionTags.findOneAndUpdate(
-      { userId: user._id, fictionId },
-      { $set: { tags: newTagIds } },
-      { upsert: true }
+    const updatedFiction = await Fiction.findOneAndUpdate(
+      { _id: fictionId, userId: user._id },
+      { $set: update }, // $set remplace uniquement les champs indiqués dans update par leurs nouvelles valeurs
+      { new: true }  // option de findOneAndUpdate : Mongoose renvoie le document mis à jour et non l'ancien document
     );
 
-    // Mise à jour usageCount
-    if (added.length > 0) {
-      await Tag.updateMany({ _id: { $in: added } }, { $inc: { usageCount: 1 } });
-    }
-    if (removed.length > 0) {
-      await Tag.updateMany(
-        { _id: { $in: removed }, usageCount: { $gt: 0 } },
-        { $inc: { usageCount: -1 } }
+    if (!updatedFiction) return res.status(404).json({ result: false, error: 'Fiction not found' });
+
+    // MAJ des tags si tagIds fourni
+    if (Array.isArray(tagIds)) {  // si tagIds est un tableau c'est true grâce à Array.isArray(), sinon c'est false. S'il n'était pas un tableau, tagIds.map aurai un bug
+      const link = await UserFictionTags.findOne({ userId: user._id, fictionId });
+      const oldIds = link ? link.tags.map(id => id.toString()) : [];  // oldIds correspond au tableau d'Ids des tags avant la MAJ
+      const newIds = tagIds.map(id => id.toString());  // newIds correspond au tableau d'Ids des tags après la MAJ
+
+      const added = newIds.filter(id => !oldIds.includes(id));  // added correspond à tous les id qui n'étaient pas dans l'ancien tableau d'IDs avant la MAJ et qui sont dans le nouveau tableau après la MAJ
+      const removed = oldIds.filter(id => !newIds.includes(id));  // removed correspond à tous les id qui étaient là avant la MAJ et qui ne sont plus là après la MAJ.
+
+      await UserFictionTags.findOneAndUpdate(   // Upsert (update + insert) : si je trouve le document, je le mets à jour. S'il n'existe pas, je le crée.
+        { userId: user._id, fictionId }, // Mongo cherche un document qui a userId et fictionId.
+        { $set: { tags: newIds } },      // Si trouvé → il le met à jour (remplace les tags par newIds).
+        { upsert: true }                 // Si non trouvé → il crée automatiquement un nouveau document avec ces valeurs.
       );
+
+      if (added.length) {   // Mise à jour automatique de usageCount
+        await Tag.updateMany({ _id: { $in: added } }, { $inc: { usageCount: 1 } }); // on incrémente de 1 usageCount pour les nouveaux IDs du document
+      }
+
+      if (removed.length) {
+        await Tag.updateMany(
+          { _id: { $in: removed }, usageCount: { $gt: 0 } },    // $gt veut dire "greater than" cad qu'on sélectionne uniquement les usageCount qui sont strictement supérieurs à 0, car on va les décrémenter
+          { $inc: { usageCount: -1 } } // on décrémente de 1 usageCount pour les anciens IDs du document
+        );
+      }
     }
 
-    return res.json({ result: true });
+    return res.json({ result: true, fiction: updatedFiction });
   } catch (error) {
-    console.error("PUT /fictions/:id/tags failed:", error);
-    return res.status(500).json({ result: false, error: "Internal server error" });
+    console.error('PUT /fiction/:id failed:', error);
+    return res.status(500).json({ result: false, error: 'Internal server error' });
   }
 });
 

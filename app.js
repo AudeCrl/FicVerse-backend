@@ -7,6 +7,7 @@ var logger = require('morgan');
 
 var indexRouter = require('./routes/index');
 var userRouter = require('./routes/user');
+var fandomRouter = require('./routes/fandom');
 var fictionRouter = require('./routes/fiction');
 var tagRouter = require('./routes/tag');
 
@@ -27,6 +28,7 @@ app.use(fileUpload());
 
 app.use('/', indexRouter);
 app.use('/user', userRouter);
+app.use('/fandom', fandomRouter);  
 app.use('/fiction', fictionRouter);
 app.use('/tag', tagRouter);
 

@@ -33,12 +33,12 @@ router.post("/", async (req, res) => {
     const user = await User.findOne({ token });
     if (!user) return res.status(401).json({ result: false, error: "Invalid token" });
 
-    const rawName = req.body.name;
-    if (!rawName || typeof rawName !== "string" || !rawName.trim()) {
+    const tagName = req.body.name;
+    if (!tagName || typeof tagName !== "string" || !tagName.trim()) {
       return res.status(400).json({ result: false, error: "Missing tag name" });
     }
 
-    const name = rawName.trim().toLowerCase();
+    const name = tagName.trim().toLowerCase();
 
     // Vérifie si le tag existe déjà
     let tag = await Tag.findOne({ userId: user._id, name });
@@ -53,6 +53,7 @@ router.post("/", async (req, res) => {
     }
 
     return res.json({ result: true, tag });
+    
   } catch (error) {
     console.error("POST /tags failed:", error);
     return res.status(500).json({ result: false, error: "Internal server error" });
