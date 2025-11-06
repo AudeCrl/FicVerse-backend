@@ -473,7 +473,7 @@ router.put('/:id', async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     // Check required fields
-    const token = req.headers.authorization.split(' ')[1];
+    const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
 
     // Check user's token
