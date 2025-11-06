@@ -18,5 +18,8 @@
     "mongoose": "^8.19.2",
     "morgan": "~1.9.1",
     "uid2": "^1.0.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.4"
   }
 }
