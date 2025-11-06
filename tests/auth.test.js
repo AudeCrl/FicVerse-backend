@@ -26,7 +26,7 @@ describe('POST /user/signin', () => {   // Regroupe tous les tests relatifs à l
       .send({ email: '', password: 'azerty123' });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ result: false, error: 'Missing or empty fields' });
+    expect(res.body).toEqual({ result: false, error: 'Missing or empty fields' });  // toEqual pour comparer objet ou tableau. toBe pour comparer boolean, number, string.
   });
 
   test('erreur si mot de passe est vide', async () => {  // Test : erreur si mot de passe vide
