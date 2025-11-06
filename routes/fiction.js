@@ -469,4 +469,47 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// DELETE /fiction/:id -> DELETE A FICTION and update tag usageCount
+router.delete("/:id", async (req, res) => {
+  try {
+    // Check required fields
+    const token = req.headers.authorization.split(' ')[1];
+    if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
+
+    // Check user's token
+    const user = await User.findOne({ token });
+    if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
+
+    const { _id: userId } = user;
+    const fictionId = req.params.id;
+
+    // Check if the fiction exists and is owned by the user
+    const fiction = await Fiction.findOne({ _id: fictionId, userId });
+    if (!fiction) return res.status(404).json({ result: false, error: 'Fiction not found' });
+
+    // Get associated tags (UserFictionTags collection)
+    const tagLink = await UserFictionTags.findOne({ userId, fictionId });
+
+    // Decrement usageCount on each tag used in the fiction
+    if (tagLink && tagLink.tags.length > 0) {
+      await Tag.updateMany(
+        { _id: { $in: tagLink.tags } },
+        { $inc: { usageCount: -1 } }
+      );
+    }
+
+    // Delete fiction
+    await Fiction.deleteOne({ _id: fictionId, userId });
+
+    // Delete the link in UserFictionTags
+    await UserFictionTags.deleteOne({ fictionId, userId });
+
+    return res.json({ result: true, message: "Fiction deleted successfully" });
+
+  } catch (error) {
+    console.error("DELETE /fiction/:id failed:", error);
+    return res.status(500).json({ result: false, error: "Internal server error" });
+  }
+});
+
 module.exports = router;
