@@ -9,6 +9,11 @@ const langSchema = new mongoose.Schema({
     position: Number,
 });
 
+const rateSchema = new mongoose.Schema({
+    value: { type: Number, min: 0, max: 5 },
+    display: { type: Boolean, default: false },
+});
+
 const fictionSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
     title: { type: String, trim: true, required: true },
@@ -22,12 +27,9 @@ const fictionSchema = new mongoose.Schema({
     readingStatus: { type: String, enum: READING_STATUS, required: true },
     storyStatus: { type: String, enum: STORY_STATUS },
     lang: { type: langSchema, required: false },
+    rate: { type: rateSchema, required: false },
     lastReadAt: Date,
     image: { type: String, trim: true },
-    rate: {
-        value: { type: Number, min: 0, max: 5 },
-        display: { type: Boolean, default: false },
-    },
     lastChapterRead: { type: Number, min: 0, default: 0 },
 },
 {
