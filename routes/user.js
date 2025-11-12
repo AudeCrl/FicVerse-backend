@@ -3,6 +3,7 @@ var router = express.Router();
 
 const { User } = require('../models/users');
 const { checkBody } = require('../modules/checkBody');
+const { checkAuth } = require('../modules/checkAuth');
 const uid2 = require('uid2');
 const bcrypt = require('bcrypt');
 const expressFileUpload = require('express-fileupload'); // Pour gérer le fichier
@@ -158,21 +159,9 @@ router.patch('/upload', async (req, res) => {
   }
 });
 
-router.patch('/username', async (req, res) => {
+router.patch('/username', checkAuth, async (req, res) => {
   try {
-    //Authentification via le bearer token
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ result: false, error: 'Missing token in Authorization header' });
-    }
-
-    const userToUpdate = await User.findOne({ token });
-
-    if (!userToUpdate) {
-      return res.status(404).json({ result: false, error: 'User not found or token invalid' });
-    }
+    const token = req.user.token;
     
     //Recuperation des infos du front
     const newUsername = req.body.username.trim();
