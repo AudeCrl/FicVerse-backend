@@ -2,6 +2,10 @@ var express = require('express');
 var router = express.Router();
 
 const { User } = require('../models/users');
+const Fiction = require('../models/fictions');
+const Tag = require('../models/tags');
+const Fandom = require('../models/fandoms');
+const UserFictionTags = require('../models/userfictiontags');
 const { checkBody } = require('../modules/checkBody');
 const { checkAuth } = require('../modules/checkAuth');
 const uid2 = require('uid2');
@@ -70,7 +74,7 @@ router.post('/signin', (req, res) => { // on se connecte
 });
 
 // Route pour suppprimer un compte
-router.delete('/remove', (req, res) => {
+router.delete('/remove', async (req, res) => {
   const { token, password } = req.body;
 
   if (!checkBody(req.body, ['token', 'password'])) {
@@ -78,30 +82,37 @@ router.delete('/remove', (req, res) => {
     return;
   }
 
-  User.findOne({ token: token})
-  .then(userToDelete => {
+  try {
+    // 1. Vérifier que l'utilisateur existe et valider le mot de passe
+    const userToDelete = await User.findOne({ token: token });
+
     if (!userToDelete) {
-      res.json({ result: false, error: 'User not found'});
+      res.json({ result: false, error: 'User not found' });
       return;
     }
+
     if (!bcrypt.compareSync(password, userToDelete.passwordHash)) {
       res.json({ result: false, error: 'Invalid password confirmation' });
       return;
     }
 
-    return User.deleteOne({ token: token })
-      .then(deleteResult => {
-        if (deleteResult.deletedCount > 0) {
-          res.json({ result: true, message: 'Account successfully deleted' });
-        }else {
-          res.json({ result: false, error: 'User deletion failed' });
-        }
-      });
-  })
-    .catch(error => {
-    console.log(('Error during account removal:', error));
-    res.status(500).json({ result: false, error: 'Internat server error during deletion' });    
-  });
+    // 2. Suppression en cascade de toutes les données liées à l'utilisateur
+    const userId = userToDelete._id;
+
+    // Supprimer dans cet ordre : on part du plus spécifique (relations) vers le plus général (entités)
+    await UserFictionTags.deleteMany({ userId });  // Relations fiction-tags
+    await Fiction.deleteMany({ userId });           // Fictions
+    await Tag.deleteMany({ userId });               // Tags
+    await Fandom.deleteMany({ userId });            // Fandoms
+    await User.deleteOne({ _id: userId });          // Utilisateur
+
+    console.log(`User ${userToDelete.username} and all related data successfully deleted`);
+    res.json({ result: true, message: 'Account successfully deleted' });
+
+  } catch (error) {
+    console.error('Error during account removal:', error);
+    res.status(500).json({ result: false, error: 'Internal server error during deletion' });
+  }
 });
 
 //Upload de l'avatar de l'utilisateur
