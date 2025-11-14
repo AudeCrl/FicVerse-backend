@@ -5,7 +5,7 @@ const STORY_STATUS = ["in-progress", "completed", "one-shot", "abandoned"];
 const READING_STATUS = ["to-read", "reading", "finished"];
 
 const langSchema = new mongoose.Schema({
-    name: { type: String, trim: true, required: true },
+    name: { type: String, trim: true },
     position: Number,
 });
 
