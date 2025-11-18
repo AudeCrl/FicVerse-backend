@@ -9,6 +9,114 @@ const UserFictionTags = require('../models/userfictiontags');
 const Tag = require('../models/tags');
 
 
+// GET /fiction -> Retourne toutes les fictions du user
+router.get('/', async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+        if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
+        
+        const user = await User.findOne({ token });
+        if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
+        
+        const userId = user._id;
+
+        const fictions = await Fiction.aggregate([
+            // 1. Filtrer par userId
+            { $match: { userId: userId } },
+
+            // 2. Trier par date de dernière lecture
+            { $sort: { lastReadAt: -1 } },
+
+            // 3. Joindre le fandom pour récupérer son nom
+            {
+                $lookup: {
+                    from: 'fandoms',
+                    localField: 'fandomId',
+                    foreignField: '_id',
+                    as: 'fandomInfo'
+                }
+            },
+
+            // 4. Projection finale (sans les tags - ils sont fetchés séparément)
+            {
+                $project: {
+                    _id: 1,
+                    userId: 1,
+                    title: 1,
+                    link: 1,
+                    summary: 1,
+                    personalNotes: 1,
+                    author: 1,
+                    fandomId: 1,
+                    fandomName: { $arrayElemAt: ['$fandomInfo.name', 0] },
+                    numberOfWords: 1,
+                    numberOfChapters: 1,
+                    readingStatus: 1,
+                    storyStatus: 1,
+                    lang: '$lang.name',
+                    lastReadAt: 1,
+                    image: 1,
+                    rate: 1,
+                    lastChapterRead: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                }
+            }
+        ]);
+
+        return res.json({ result: true, fictions });
+
+    } catch (error) {
+        console.error('Error fetching all fictions:', error);
+        return res.status(500).json({ result: false, error: 'Internal error' });
+    }
+});
+
+// GET /fiction/author -> Retourne la liste unique des auteurs
+router.get('/author', async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+        if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
+
+        const user = await User.findOne({ token });
+        if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
+
+        const userId = user._id;
+
+        // Agrégation pour extraire les auteurs uniques, triés alphabétiquement
+        const authors = await Fiction.aggregate([
+            // 1. Filtrer par userId
+            { $match: { userId: userId } },
+
+            // 2. Filtrer uniquement les fictions avec auteur non vide
+            { $match: { author: { $exists: true, $ne: "" } } },
+
+            // 3. Suppression des doublons : regroupe les documents par auteur pour ne garder qu'un exemplaire unique de chaque auteur
+            {
+                $group: {
+                    _id: "$author", // Clé de groupement
+                    name: { $first: "$author" }   // Valeur d'affichage (garde la 1ère occurrence)
+                }
+            },
+
+            // 4. Trier alphabétiquement
+            { $sort: { name: 1 } },
+
+            // 5. Projection : seulement le nom. Pas besoin d'envoyer l'id
+            { $project: { _id: 0, name: 1 } }
+        ]);
+
+        return res.json({
+            result: true,
+            authors: authors.map(a => a.name)
+        });
+
+    } catch (error) {
+        console.error('Error fetching authors:', error);
+        return res.status(500).json({ result: false, error: 'Internal error' });
+    }
+});
+
 // GET /fiction/:readingStatus?srt=rate&order=desc -> Get fandom with fiction by readingStatus
 router.get('/status/:readingStatus', async (req, res) => {
     try {        

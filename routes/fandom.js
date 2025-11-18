@@ -5,36 +5,24 @@ const { User } = require("../models/users");
 const Fandom = require("../models/fandoms");
 const Fiction = require("../models/fictions");
 
-// GET /fandom/user -> Get user's fandoms
-router.get("/user", async (req, res) => {
+// GET /fandom -> liste des fandoms du user, triés par position asc
+router.get('/', async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
-
-    if (!token) {
-      return res.status(401).json({
-        result: false,
-        error: "Missing token in Authorization header",
-      });
-    }
+    const token = req.headers.authorization.split(' ')[1];
+    if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
 
     const user = await User.findOne({ token });
-    if (!user) {
-      return res
-        .status(401)
-        .json({ result: false, error: "Invalid or expired token" });
-    }
+    if (!user) return res.status(401).json({ result: false, error: 'Invalid or expired token' });
 
-    const fandoms = await Fandom.find({ userId: user._id }).sort({
-      position: 1,
-    });
+    const fandoms = await Fandom
+      .find({ userId: user._id })
+      .sort({ position: 1 }) // tri par position
 
     return res.json({ result: true, fandoms });
+
   } catch (error) {
-    console.error("Error fetching user fandoms:", error);
-    return res
-      .status(500)
-      .json({ result: false, error: "Internal server error" });
+    console.error('GET /fandom failed:', error);
+    return res.status(500).json({ result: false, error: 'Internal server error' });
   }
 });
 
@@ -88,41 +76,6 @@ router.get("/:id/usage-count", async (req, res) => {
       .json({ result: false, error: "Internal server error" });
   }
 });
-
-/*
-// GET /fandom -> Get all fandoms for the user
-router.get("/", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
-
-    if (!token) {
-      return res.status(401).json({
-        result: false,
-        error: "Missing token in Authorization header",
-      });
-    }
-
-    const user = await User.findOne({ token });
-    if (!user) {
-      return res
-        .status(401)
-        .json({ result: false, error: "Invalid or expired token" });
-    }
-
-    const fandoms = await Fandom.find({ userId: user._id }).sort({
-      position: 1,
-    });
-
-    return res.json({ result: true, fandoms });
-  } catch (error) {
-    console.error("Error fetching fandoms:", error);
-    return res
-      .status(500)
-      .json({ result: false, error: "Internal server error" });
-  }
-});
-*/
 
 // DELETE /fandom/:id -> Delete a fandom
 // Query params:
@@ -198,29 +151,6 @@ router.delete("/:id", async (req, res) => {
     return res
       .status(500)
       .json({ result: false, error: "Internal server error" });
-  }
-});
-
-
-// GET /fandom -> liste des fandoms du user, triés par position asc
-router.get('/', async (req, res) => {
-  try {
-    const token = req.headers.authorization.split(' ')[1];
-    if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
-
-    const user = await User.findOne({ token });
-    if (!user) return res.status(401).json({ result: false, error: 'Invalid or expired token' });
-
-    const fandoms = await Fandom
-      .find({ userId: user._id })
-      .sort({ position: 1 }) // tri par position
-      .lean();
-
-    return res.json({ result: true, fandoms });
-
-  } catch (error) {
-    console.error('GET /fandom failed:', error);
-    return res.status(500).json({ result: false, error: 'Internal server error' });
   }
 });
 

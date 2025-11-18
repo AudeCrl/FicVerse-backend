@@ -31,7 +31,7 @@ userFictionTagsSchema.index({ userId: 1, tags: 1 });
 /* 
 Si je n'avais pas mis en place cet index, MongoDB aurait parcouru toutes les documents pour vérifier d'abord le userId == le userId demandé.
 Puis scanner tous les tags == le tag demandé.
-Alors qu'avec cet index, MongoDB va directement récupérer l'information dans le userID concerné ET dans le tag concerné.
+Alors qu'avec cet index, MongoDB va directement accéder à l'information dans le userID concerné et parcourir les tags jusqu'au tag concerné.
 Ex : { userId: U1, tags: [T1, T2, T70] }.
 Si je fais une requête pour chercher { userId: U1, tags: T70 }
 MongoDB va directement aller jusqu'à userId = U1 et aller directement à tags = T70.

@@ -30,33 +30,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /tag/all -> tous les tags de l'utilisateur (pour le formulaire d'ajout)
-router.get("/all", async (req, res) => {
-  try {
-    const token = req.headers.authorization.split(" ")[1];
-    if (!token)
-      return res.status(401).json({ result: false, error: "Missing token" });
-
-    const user = await User.findOne({ token });
-    if (!user)
-      return res
-        .status(401)
-        .json({ result: false, error: "Invalid or expired token" });
-
-    // Retourner tous les tags de l'utilisateur
-    const tags = await Tag.find({ userId: user._id })
-      .sort({ usageCount: -1, name: 1 })
-      .lean();
-
-    return res.json({ result: true, tags });
-  } catch (error) {
-    console.error("GET /tag/all failed:", error);
-    return res
-      .status(500)
-      .json({ result: false, error: "Internal server error" });
-  }
-});
-
 // POST /tag -> créer un tag orphelin
 router.post("/", async (req, res) => {
   try {
