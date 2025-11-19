@@ -163,7 +163,7 @@ router.post('/', async (req, res) => {
     const user = await User.findOne({ token });
     if (!user) return res.status(401).json({ result: false, error: 'Invalid or expired token' });
 
-    const fandomLabel = String(req.body.name || '').trim();   // S jamais le back reçoit un name vide, on a la sécurité || ""
+    const fandomLabel = String(req.body.name || '').trim();   // Si jamais le back reçoit un name vide, on a la sécurité || ""
     if (!fandomLabel) return res.json({ result: false, error: 'Missing name' });
 
     // dédoublonnage simple: même nom exact (casse ignorée) pour ce user
@@ -174,9 +174,8 @@ router.post('/', async (req, res) => {
 
     const positionFandom = (await Fandom.countDocuments({ userId: user._id })) + 1;
     const newfandom = await new Fandom({ userId: user._id, name: fandomLabel, position: positionFandom }).save();
-
-    return res.json({ result: true, created: true, fandom: newfandom })
-    ;
+    return res.json({ result: true, created: true, fandom: newfandom });
+    
   } catch (error) {
     console.error('POST /fandom failed:', error);
     return res.status(500).json({ result: false, error: 'Internal server error' });
