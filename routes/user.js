@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 
-const { User } = require('../models/users');
+const { User, THEMES, APPEARANCE_MODES, NOTATION_ICON_TYPES } = require('../models/users');
 const Fiction = require('../models/fictions');
 const Tag = require('../models/tags');
 const Fandom = require('../models/fandoms');
@@ -115,13 +115,13 @@ router.delete('/remove', async (req, res) => {
   }
 });
 
-//Upload de l'avatar de l'utilisateur
+// Upload de l'avatar de l'utilisateur
 router.patch('/upload', async (req, res) => {
   // console.log(req.files.avatarFromFront);
   let tempFilePath = null;  
 
   try {
-    //Authentification via le bearer token
+    // Authentification via le bearer token
     const authHeader = req.headers.authorization;
     const token = authHeader?.split(' ')[1];
 
@@ -135,7 +135,7 @@ router.patch('/upload', async (req, res) => {
       return res.status(404).json({ result: false, error: 'User not found or token invalid' });
     }
 
-    //Vérification et upload du fichier
+    // Vérification et upload du fichier
     if (!req.files || !req.files.avatarFromFront) {
       return res.json({ result: false, error: 'Avatar file missing' });
     }
@@ -174,12 +174,12 @@ router.patch('/username', checkAuth, async (req, res) => {
   try {
     const token = req.user.token;
     
-    //Recuperation des infos du front
+    // Récupération des infos du front
     const newUsername = req.body.username.trim();
 
     if (!newUsername || newUsername.length === 0) {
-            return res.json({ result: false, error: 'New username cannot be empty' });
-        }
+      return res.json({ result: false, error: 'New username cannot be empty' });
+    }
 
     const existingUser = await User.findOne({ username: newUsername });
     if (existingUser && existingUser.token !== token) {
@@ -189,7 +189,7 @@ router.patch('/username', checkAuth, async (req, res) => {
     const updatedUser = await User.findOneAndUpdate(
       { token },
       { username: newUsername },
-      { new: true } //renvoi le document mis à jour plutot que l'ancien document
+      { new: true } // renvoie le document mis à jour plutôt que l'ancien document
     );
 
     if (!updatedUser) {
@@ -207,7 +207,7 @@ router.patch('/username', checkAuth, async (req, res) => {
 
 router.patch('/email', async (req, res) => {
   try {
-    //Authentification via le bearer token
+    // Authentification via le bearer token
     const authHeader = req.headers.authorization;
     const token = authHeader?.split(' ')[1];
 
@@ -221,12 +221,12 @@ router.patch('/email', async (req, res) => {
       return res.status(404).json({ result: false, error: 'User not found or token invalid' });
     }
     
-    //Recuperation des infos du front
+    // Récupération des infos du front
     const newEmail = req.body.email.trim();
 
     if (!newEmail || newEmail.length === 0) {
-            return res.json({ result: false, error: 'New email cannot be empty' });
-        }
+      return res.json({ result: false, error: 'New email cannot be empty' });
+    }
 
     const existingUser = await User.findOne({ email: newEmail });
     if (existingUser && existingUser.token !== token) {
@@ -236,7 +236,7 @@ router.patch('/email', async (req, res) => {
     const updatedUser = await User.findOneAndUpdate(
       { token },
       { email: newEmail },
-      { new: true } //renvoi le document mis à jour plutot que l'ancien document
+      { new: true } // renvoie le document mis à jour plutôt que l'ancien document
     );
 
     if (!updatedUser) {
@@ -249,6 +249,100 @@ router.patch('/email', async (req, res) => {
     console.error('Error updating email:', error);
     res.status(500).json({ result: false, error: 'Internal server error during email update'});
     
+  }
+})
+
+// Route pour pour modifier uniquement le theme
+router.patch('/theme', checkAuth, async (req, res) => {
+  try {
+    const token = req.user.token;
+
+    // Récupération des infos du front
+    const newTheme = req.body.theme;
+
+    if (!newTheme) {
+      return res.json({ result: false, error: 'Theme name is empty' });
+    }
+
+    // Validation du thème
+    if (!THEMES.includes(newTheme)) {
+      return res.json({ result: false, error: `Invalid theme. Must be one of: ${THEMES.join(', ')}` });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { token },
+      { theme: newTheme },
+      { new: true } // renvoie le document mis à jour plutôt que l'ancien document
+    );
+
+    res.json({ result: true, message: 'Theme updated successfully', theme: updatedUser.theme });
+
+  } catch (error) {
+    console.error('Error updating theme:', error);
+    res.status(500).json({ result: false, error: 'Internal server error during theme update'});
+
+  }
+})
+
+// Route pour modifier le mode d'apparence (light/dark)
+router.patch('/appearance-mode', checkAuth, async (req, res) => {
+  try {
+    const token = req.user.token;
+
+    // Récupération des infos du front
+    const newAppearanceMode = req.body.appearanceMode;
+
+    if (!newAppearanceMode) {
+      return res.json({ result: false, error: 'Appearance mode is empty' });
+    }
+
+    // Validation du mode d'apparence
+    if (!APPEARANCE_MODES.includes(newAppearanceMode)) {
+      return res.json({ result: false, error: `Invalid appearance mode. Must be one of: ${APPEARANCE_MODES.join(', ')}` });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { token },
+      { appearanceMode: newAppearanceMode },
+      { new: true }
+    );
+
+    res.json({ result: true, message: 'Appearance mode updated successfully', appearanceMode: updatedUser.appearanceMode });
+
+  } catch (error) {
+    console.error('Error updating appearance mode:', error);
+    res.status(500).json({ result: false, error: 'Internal server error during appearance mode update'});
+  }
+})
+
+// Route pour modifier l'icône de notation
+router.patch('/notation-icon', checkAuth, async (req, res) => {
+  try {
+    const token = req.user.token;
+
+    // Récupération des infos du front
+    const newNotationIcon = req.body.notationIcon;
+
+    if (!newNotationIcon) {
+      return res.json({ result: false, error: 'Notation icon is empty' });
+    }
+
+    // Validation de l'icône de notation
+    if (!NOTATION_ICON_TYPES.includes(newNotationIcon)) {
+      return res.json({ result: false, error: `Invalid notation icon. Must be one of: ${NOTATION_ICON_TYPES.join(', ')}` });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { token },
+      { notationIcon: newNotationIcon },
+      { new: true }
+    );
+
+    res.json({ result: true, message: 'Notation icon updated successfully', notationIcon: updatedUser.notationIcon });
+
+  } catch (error) {
+    console.error('Error updating notation icon:', error);
+    res.status(500).json({ result: false, error: 'Internal server error during notation icon update'});
   }
 })
 
