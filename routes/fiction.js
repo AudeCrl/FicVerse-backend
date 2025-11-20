@@ -443,7 +443,7 @@ router.get("/:id", async (req, res) => {
 
     const fictionId = req.params.id;
 
-    const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id }).lean();     // On récupère la fiction (et donc ses champs) associée à ce user. Et lean() nous le donne sous le format d'un objet JavaScript
+    const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id });
     if (!fiction) return res.status(404).json({ result: false, error: "Fiction not found" });
 
     const fandom = await Fandom.findOne({ _id: fiction.fandomId, userId: user._id }).lean(); // On récupère le nom du fandom
