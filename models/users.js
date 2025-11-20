@@ -22,4 +22,4 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-module.exports = { User, NOTATION_ICON_TYPES, APPEARANCE_MODES };
+module.exports = { User, NOTATION_ICON_TYPES, THEMES, APPEARANCE_MODES };
