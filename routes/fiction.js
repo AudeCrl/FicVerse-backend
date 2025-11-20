@@ -446,10 +446,10 @@ router.get("/:id", async (req, res) => {
     const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id });
     if (!fiction) return res.status(404).json({ result: false, error: "Fiction not found" });
 
-    const fandom = await Fandom.findOne({ _id: fiction.fandomId, userId: user._id }).lean(); // On récupère le nom du fandom
+    const fandom = await Fandom.findOne({ _id: fiction.fandomId, userId: user._id }); // On récupère le nom du fandom
     fiction.fandomName = fandom.name;  // pour être aligné avec le fetch sur le front qui fait setFandomName(data.fiction.fandomName);
 
-    const link = await UserFictionTags.findOne({ userId: user._id, fictionId }).lean(); // On récupère les informations du document couplant cette fiction avec ce user dans UserFictionTags
+    const link = await UserFictionTags.findOne({ userId: user._id, fictionId }); // On récupère les informations du document couplant cette fiction avec ce user dans UserFictionTags
 
     let tags = [];
     if (link && link.tags.length > 0) {   // Si on récupère ce document et que dedans le tableau d'id des tags n'est pas vide
