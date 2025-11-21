@@ -3,7 +3,7 @@ process.env.NODE_ENV = 'test'; // sécurité qui empêche la connexion à la DB 
 jest.mock('../models/connection', () => ({  // placé avant const app = require('../app'); pour empêcher la connexion à la DB
   connectDB: jest.fn(),
   mongoose: { connection: { close: jest.fn() } },
-}), { virtual: true }); // ce module n’existe pas physiquement, le créer en mémoire
+}), { virtual: true }); // ce module n’existe pas physiquement, elle ordonne de le créer en mémoire
 
 jest.mock('../models/users', () => ({   // simulation du modèle User avec une méthode findOne donc User.findOne est mocké aussi
   User: {
