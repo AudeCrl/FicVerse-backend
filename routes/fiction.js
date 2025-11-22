@@ -84,7 +84,7 @@ router.get('/author', async (req, res) => {
         const userId = user._id;
 
         // Agrégation pour extraire les auteurs uniques, triés alphabétiquement
-        const authors = await Fiction.aggregate([
+        const authorList = await Fiction.aggregate([
             // 1. Filtrer par userId
             { $match: { userId: userId } },
 
@@ -108,7 +108,7 @@ router.get('/author', async (req, res) => {
 
         return res.json({
             result: true,
-            authors: authors.map(a => a.name)
+            authorList: authorList.map(a => a.name)
         });
 
     } catch (error) {
