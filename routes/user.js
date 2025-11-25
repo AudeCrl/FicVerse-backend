@@ -73,6 +73,7 @@ router.post('/signin', (req, res) => { // on se connecte
   });
 });
 
+
 // Route pour suppprimer un compte
 router.delete('/remove', async (req, res) => {
   const { token, password } = req.body;
