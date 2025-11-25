@@ -22,9 +22,7 @@ cloudinary.config({
 
 
 router.post('/signup', (req, res) => { // création d'un nouveau compte user
-  
   const { email, username, password } = req.body;
-
   if (!checkBody(req.body, ['email', 'username', 'password'])) {  // On vérifie que les champs sont bien remplis
     res.json({ result: false, error: 'Missing or empty fields' });
     return;
