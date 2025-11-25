@@ -52,12 +52,13 @@ router.post("/", async (req, res) => {
     let tag = await Tag.findOne({ userId: user._id, name });
 
     if (!tag) {
-      // Si le tag n'existe pas, on le crée
+      // Si le tag n'existe pas, on le crée avec une couleur aléatoire (1-5)
+      const randomColor = Math.floor(Math.random() * 5) + 1;
       tag = await new Tag({
         userId: user._id,
         name,
         usageCount: 0,
-        color: 1,
+        color: randomColor,
       }).save();
     }
 
