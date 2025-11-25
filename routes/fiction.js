@@ -14,105 +14,27 @@ router.get('/', async (req, res) => {
     try {
         const token = req.headers.authorization.split(" ")[1];
         if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
-        
+
         const user = await User.findOne({ token });
         if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
-        
+
         const userId = user._id;
 
-        const fictions = await Fiction.aggregate([
-            // 1. Filtrer par userId
-            { $match: { userId: userId } },
+        const fictions = await Fiction.find({ userId })
+            .populate('fandomId')
+            .sort({ lastReadAt: -1 })
+            .lean();
 
-            // 2. Trier par date de dernière lecture
-            { $sort: { lastReadAt: -1 } },
+        const result = fictions.map(f => ({
+            ...f,
+            fandomName: f.fandomId?.name || "Fandom inconnu",
+            lang: f.lang?.name
+        }));
 
-            // 3. Joindre le fandom pour récupérer son nom
-            {
-                $lookup: {
-                    from: 'fandoms',
-                    localField: 'fandomId',
-                    foreignField: '_id',
-                    as: 'fandomInfo'
-                }
-            },
-
-            // 4. Projection finale (sans les tags - ils sont fetchés séparément)
-            {
-                $project: {
-                    _id: 1,
-                    userId: 1,
-                    title: 1,
-                    link: 1,
-                    summary: 1,
-                    personalNotes: 1,
-                    author: 1,
-                    fandomId: 1,
-                    fandomName: { $arrayElemAt: ['$fandomInfo.name', 0] },
-                    numberOfWords: 1,
-                    numberOfChapters: 1,
-                    readingStatus: 1,
-                    storyStatus: 1,
-                    lang: '$lang.name',
-                    lastReadAt: 1,
-                    image: 1,
-                    rate: 1,
-                    lastChapterRead: 1,
-                    createdAt: 1,
-                    updatedAt: 1,
-                }
-            }
-        ]);
-
-        return res.json({ result: true, fictions });
+        return res.json({ result: true, fictions: result });
 
     } catch (error) {
         console.error('Error fetching all fictions:', error);
-        return res.status(500).json({ result: false, error: 'Internal error' });
-    }
-});
-
-// GET /fiction/author -> Retourne la liste unique des auteurs
-router.get('/author', async (req, res) => {
-    try {
-        const token = req.headers.authorization.split(" ")[1];
-        if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
-
-        const user = await User.findOne({ token });
-        if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
-
-        const userId = user._id;
-
-        // Agrégation pour extraire les auteurs uniques, triés alphabétiquement
-        const authors = await Fiction.aggregate([
-            // 1. Filtrer par userId
-            { $match: { userId: userId } },
-
-            // 2. Filtrer uniquement les fictions avec auteur non vide
-            { $match: { author: { $exists: true, $ne: "" } } },
-
-            // 3. Suppression des doublons : regroupe les documents par auteur pour ne garder qu'un exemplaire unique de chaque auteur
-            {
-                $group: {
-                    _id: "$author", // Clé de groupement
-                    name: { $first: "$author" }   // Valeur d'affichage (garde la 1ère occurrence)
-                }
-            },
-
-            // 4. Trier alphabétiquement
-            { $sort: { name: 1 } },
-
-            // 5. Projection : seulement le nom. Pas besoin d'envoyer l'id
-            { $project: { _id: 0, name: 1 } }
-        ]);
-
-        return res.json({
-            result: true,
-            authors: authors.map(a => a.name)
-        });
-
-    } catch (error) {
-        console.error('Error fetching authors:', error);
         return res.status(500).json({ result: false, error: 'Internal error' });
     }
 });
@@ -286,46 +208,6 @@ router.get('/status/:readingStatus', async (req, res) => {
 });
 
 
-// GET /fiction/language  =>  { result:true, languages:[{ name, position }] }
-router.get("/lang", async (req, res) => {
-  try {
-    const token = req.headers.authorization.split(" ")[1];
-    if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
-
-    const user = await User.findOne({ token });
-    if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
-
-    const userId = user._id;
-
-    // Agrège dans la collection des fictions du user : lang est un sous-doc { name, position }
-    const rows = await Fiction.aggregate([
-      { $match: { userId } },    // On ne regarde que les documents de cet utilisateur
-      { $match: { lang: { $exists: true, $ne: null } } },    // On ne regarde que les fictions ayant le champ "lang"
-      {
-        $project: {
-          name: "$lang.name",                               // récupère directement le nom
-          position: { $ifNull: ["$lang.position", 9999] },  // si pas de position, met 9999
-          },
-      },
-      { $match: { name: { $type: "string", $ne: "" } } },   // $ne veut dire "non equal to", "différent de"
-      {
-        $group: {                                           // pour chaque name, on garde la plus petite position rencontrée
-          _id: { $toLower: "$name" },                       // on met name en minuscule via $toLower
-          name: { $first: "$name" },                        // puis on garde uniquement la 1ère occurrence de ce name via $first
-          position: { $min: "$position" },                  // puis on le met à la plus petite position possible via $min
-        },
-      },
-      { $sort: { position: 1, name: 1 } },
-    ]);
-
-    res.json({ result: true, languages: rows.map(({ name, position }) => ({ name, position })) });
-  } catch (error) {
-    console.error("GET /fiction/language failed", error);
-    res.status(500).json({ result: false, error: "Internal error" });
-  }
-});
-
-
 // POST /fiction -> CREATE A FICTION
 router.post('/', async (req, res) => {
     try {
@@ -443,22 +325,25 @@ router.get("/:id", async (req, res) => {
 
     const fictionId = req.params.id;
 
-    const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id }).lean();     // On récupère la fiction (et donc ses champs) associée à ce user. Et lean() nous le donne sous le format d'un objet JavaScript
+    const fiction = await Fiction.findOne({ _id: fictionId, userId: user._id })
+      .populate('fandomId')
+      .lean();
+
     if (!fiction) return res.status(404).json({ result: false, error: "Fiction not found" });
 
-    const fandom = await Fandom.findOne({ _id: fiction.fandomId, userId: user._id }).lean(); // On récupère le nom du fandom
-    fiction.fandomName = fandom.name;  // pour être aligné avec le fetch sur le front qui fait setFandomName(data.fiction.fandomName);
+    // Ajouter fandomName depuis le fandom populé
+    fiction.fandomName = fiction.fandomId?.name || "Fandom inconnu";
 
-    const link = await UserFictionTags.findOne({ userId: user._id, fictionId }).lean(); // On récupère les informations du document couplant cette fiction avec ce user dans UserFictionTags
+    const link = await UserFictionTags.findOne({ userId: user._id, fictionId });
 
     let tags = [];
-    if (link && link.tags.length > 0) {   // Si on récupère ce document et que dedans le tableau d'id des tags n'est pas vide
-      tags = await Tag.find({ _id: { $in: link.tags } })  // Alors on récupère les tags (et leurs champs associés) qui ont cet id. ({ _id: { $in: link.tags } }) veut dire qu'on récupère tous les _id présents dans link.tags
-        .sort({ usageCount: -1, name: 1 }) // les tags sont triés par usageCount et ordre alphabétique
+    if (link && link.tags.length > 0) {
+      tags = await Tag.find({ _id: { $in: link.tags } })
+        .sort({ usageCount: -1, name: 1 })
         .lean();
     }
 
-    fiction.tags = tags;  // tags envoyés au front
+    fiction.tags = tags;
 
     return res.json({ result: true, fiction });
 
