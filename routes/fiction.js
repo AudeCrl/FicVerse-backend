@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 
 const { checkBody } = require('../modules/checkBody');
+const { checkAuth } = require('../modules/checkAuth');
 const { User } = require('../models/users');
 const Fiction = require('../models/fictions');
 const Fandom = require('../models/fandoms');
@@ -209,22 +210,19 @@ router.get('/status/:readingStatus', async (req, res) => {
 
 
 // POST /fiction -> CREATE A FICTION
-router.post('/', async (req, res) => {
+router.post('/', checkAuth, async (req, res) => {
     try {
         // Check required fields
-        const token = req.headers.authorization.split(' ')[1];
-        if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
-    
-        if (!checkBody(req.body, ['fandomName', 'title', 'readingStatus', 'storyStatus']))
+        if (!checkBody(req.body, ['fandomName', 'title', 'readingStatus']))
             return res.json({ result: false, error: 'Missing or empty fields' });
 
-        const {  
-            fandomName, 
-            title, 
-            link, 
+        const {
+            fandomName,
+            title,
+            link,
             author,
             langName,
-            summary, 
+            summary,
             personalNotes,
             numberOfChapters,
             numberOfWords,
@@ -236,11 +234,8 @@ router.post('/', async (req, res) => {
             rate, // object { value: Number, display: Boolean }
         } = req.body;
 
-        // Verify user's token
-        const user = await User.findOne({ token });
-        if (!user) return res.status(401).json({ result: false, error: 'Invalid or expired token' });
-        
-        const userId = user._id;
+        // User is already verified by checkAuth middleware
+        const userId = req.user._id;
         
         // FANDOM: Check if it exists or create it
         let newFandom;
@@ -256,23 +251,14 @@ router.post('/', async (req, res) => {
         }
         const fandomId = existingFandom ? existingFandom._id : newFandom._id;
 
-        // LANG: Find or assign position
-        let langPosition;
-        const existingLang = await Fiction.findOne({ userId, 'lang.name': langName });
-        if (existingLang) {
-            langPosition = existingLang.lang.position;
-        } else {
-            const distinctlangs = await Fiction.distinct('lang.name', { userId });
-            langPosition = distinctlangs.length + 1;
-        }
+        // LANG: Find or assign position (optimized with single query)
+        const distinctLangs = await Fiction.distinct('lang.name', { userId });
+        const existingLangIndex = distinctLangs.findIndex(l => l === langName);
+        const langPosition = existingLangIndex !== -1
+            ? existingLangIndex + 1  // Language already exists, use its position (index + 1)
+            : distinctLangs.length + 1;  // New language, position = total count + 1
         const lang = { name: langName, position: langPosition };
 
-        // Model.distinct(<champ>, <filtre>)
-        // - <champ> : le champ dont on veut récupérer les valeurs uniques
-        //   → ici "lang.name", car lang est un sous-document.
-        // - <filtre> (optionnel) : un objet de conditions, comme pour find()
-        //   -> ici { userId }, pour ne récupérer que les langues de cet utilisateur précis.
-        
         // LASTREADAT: If lastChapterRead is filled in, set lastReadAt to now
         const lastReadAt = lastChapterRead > 0 ? new Date() : null;
 
@@ -293,8 +279,8 @@ router.post('/', async (req, res) => {
             lastReadAt,
             image: image || '',
             rate: {
-                value: rate?.value || 0,
-                display: rate?.display ?? false,
+                value: rate?.value || 0, // || 0 : if null / undefined / false / 0 / NaN
+                display: rate?.display ?? false, // ?? false : if null / undefined -> false
             },
             lastChapterRead: lastChapterRead || 0,
         }).save();
@@ -308,7 +294,7 @@ router.post('/', async (req, res) => {
         return res.json({ result: true, message: "Fiction created successfully", fiction: newFiction });
 
     } catch (error) {
-        console.error('Error while fetching fictions:', error);
+        console.error('Error while creating fiction:', error);
         return res.status(500).json({ result: false, error: 'Internal server error' });
     }
 });
@@ -463,22 +449,15 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /fiction/:id -> DELETE A FICTION and update tag usageCount
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", checkAuth, async (req, res) => {
   try {
-    // Check required fields
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ result: false, error: 'Missing token' });
-
-    // Check user's token
-    const user = await User.findOne({ token });
-    if (!user) return res.status(401).json({ result: false, error: 'Invalid token' });
-
-    const { _id: userId } = user;
+    // User is already verified by checkAuth middleware
+    const userId = req.user._id;
     const fictionId = req.params.id;
 
-    // Check if the fiction exists and is owned by the user
-    const fiction = await Fiction.findOne({ _id: fictionId, userId });
-    if (!fiction) return res.status(404).json({ result: false, error: 'Fiction not found' });
+    // Delete fiction (optimized: check existence and delete in one query)
+    const deletedFiction = await Fiction.findOneAndDelete({ _id: fictionId, userId });
+    if (!deletedFiction) return res.status(404).json({ result: false, error: 'Fiction not found' });
 
     // Get associated tags (UserFictionTags collection)
     const tagLink = await UserFictionTags.findOne({ userId, fictionId });
@@ -490,9 +469,6 @@ router.delete("/:id", async (req, res) => {
         { $inc: { usageCount: -1 } }
       );
     }
-
-    // Delete fiction
-    await Fiction.deleteOne({ _id: fictionId, userId });
 
     // Delete the link in UserFictionTags
     await UserFictionTags.deleteOne({ fictionId, userId });
